@@ -53,9 +53,10 @@ GLint projectionLoc;
 
 // camera
 gps::Camera myCamera(
-    glm::vec3(5.0f, 1.0f, 0.0f),
-    glm::vec3(0.0f, 1.0f, -1.0f),
-    glm::vec3(0.0f, 1.0f, 0.0f));
+    glm::vec3(3.0f, 1.0f, 2.0f),   // Updated position: Closer and to the left
+    glm::vec3(0.0f, 1.0f, 0.0f),   // Updated target: Focuses directly on the motorcycle
+    glm::vec3(0.0f, 1.0f, 0.0f)    // Up vector remains the same
+);
 
 GLfloat cameraSpeed = 0.1f;
 
@@ -170,8 +171,10 @@ void processMovement() {
         angle -= 1.0f;
         // update model matrix for motorcycle
         motorcycle_model = glm::rotate(glm::mat4(1.0f), glm::radians(angle), glm::vec3(0, 1, 0));
+		parking_lot_model = glm::rotate(glm::mat4(1.0f), glm::radians(angle), glm::vec3(0, 1, 0));
         // update normal matrix for motorcycle
         motorcycle_normalMatrix = glm::mat3(glm::inverseTranspose(view* motorcycle_model));
+		parking_lot_normalMatrix = glm::mat3(glm::inverseTranspose(view * parking_lot_model));
         //glUniformMatrix4fv(motorcycle_modelLoc, 1, GL_FALSE, glm::value_ptr(motorcycle_model));
     }
 
@@ -179,13 +182,16 @@ void processMovement() {
         angle += 1.0f;
         // update model matrix for motorcycle
         motorcycle_model = glm::rotate(glm::mat4(1.0f), glm::radians(angle), glm::vec3(0, 1, 0));
+		parking_lot_model = glm::rotate(glm::mat4(1.0f), glm::radians(angle), glm::vec3(0, 1, 0));
         // update normal matrix for motorcycle
         motorcycle_normalMatrix = glm::mat3(glm::inverseTranspose(view* motorcycle_model));
+		parking_lot_normalMatrix = glm::mat3(glm::inverseTranspose(view * parking_lot_model));
         //glUniformMatrix4fv(motorcycle_modelLoc, 1, GL_FALSE, glm::value_ptr(motorcycle_model));
     }
 	if (pressedKeys[GLFW_KEY_L]) {
 		cameraLock = !cameraLock;
 	}
+	//std::cout << "Camera position: " << myCamera.getPosition().x << " " << myCamera.getPosition().y << " " << myCamera.getPosition().z << "\n";
 }
 
 void initOpenGLWindow() {
@@ -226,9 +232,9 @@ void initUniforms() {
 
     // create model matrix for teapot
 	motorcycle_model = glm::mat4(1.0f);
-	motorcycle_modelLoc = glGetUniformLocation(myBasicShader.shaderProgram, "motorcycle_model");
+	motorcycle_modelLoc = glGetUniformLocation(myBasicShader.shaderProgram, "model");
 	parking_lot_model = glm::mat4(1.0f);
-	parking_lot_modelLoc = glGetUniformLocation(myBasicShader.shaderProgram, "parking_lot_model");
+	parking_lot_modelLoc = glGetUniformLocation(myBasicShader.shaderProgram, "model");
 	// get view matrix for current camera
 	view = myCamera.getViewMatrix();
 	viewLoc = glGetUniformLocation(myBasicShader.shaderProgram, "view");
@@ -237,12 +243,12 @@ void initUniforms() {
 
     // compute normal matrix for motorcycle
     motorcycle_normalMatrix = glm::mat3(glm::inverseTranspose(view*motorcycle_model));
-	motorcycle_normalMatrixLoc = glGetUniformLocation(myBasicShader.shaderProgram, "motorcyle_normalMatrix");
+	motorcycle_normalMatrixLoc = glGetUniformLocation(myBasicShader.shaderProgram, "normalMatrix");
 
 
 	// compute normal matrix for parking_lot
 	parking_lot_normalMatrix = glm::mat3(glm::inverseTranspose(view * parking_lot_model));
-	parking_lot_normalMatrixLoc = glGetUniformLocation(myBasicShader.shaderProgram, "parking_lot_normalMatrix");
+	parking_lot_normalMatrixLoc = glGetUniformLocation(myBasicShader.shaderProgram, "normalMatrix");
 	// create projection matrix
 	projection = glm::perspective(glm::radians(45.0f),
                                (float)myWindow.getWindowDimensions().width / (float)myWindow.getWindowDimensions().height,

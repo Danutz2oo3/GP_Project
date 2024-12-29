@@ -8,20 +8,19 @@ out vec3 fNormal;
 out vec4 fPosEye;
 out vec2 fragTexCoords; // Add this line
 
-uniform mat4 motorcycle_model;
-uniform mat4 parking_lot_model;
+uniform mat4 model;
 uniform mat4 view;
 uniform mat4 projection;
-uniform mat3 motorcyle_normalMatrix;
-uniform mat3 parking_lot_normalMatrix;
+uniform mat3 normalMatrix;
+
 
 
 
 void main() 
 {
     // compute eye space coordinates
-    fPosEye = view * motorcycle_model * vec4(vPosition, 1.0f);
-    fNormal = normalize(motorcyle_normalMatrix * vNormal);
+    fPosEye = view * model * vec4(vPosition, 1.0f);
+    fNormal = normalize(normalMatrix * vNormal);
     fragTexCoords = vTexCoords; // Add this line
-    gl_Position = projection * view * motorcycle_model * vec4(vPosition, 1.0f);
+    gl_Position = projection * view * model * vec4(vPosition, 1.0f);
 }
