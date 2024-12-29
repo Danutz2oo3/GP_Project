@@ -4,18 +4,24 @@ layout(location=0) in vec3 vPosition;
 layout(location=1) in vec3 vNormal;
 layout(location=2) in vec2 vTexCoords;
 
-out vec3 fPosition;
 out vec3 fNormal;
-out vec2 fTexCoords;
+out vec4 fPosEye;
+out vec2 fragTexCoords; // Add this line
 
-uniform mat4 model;
+uniform mat4 motorcycle_model;
+uniform mat4 parking_lot_model;
 uniform mat4 view;
 uniform mat4 projection;
+uniform mat3 motorcyle_normalMatrix;
+uniform mat3 parking_lot_normalMatrix;
+
+
 
 void main() 
 {
-	gl_Position = projection * view * model * vec4(vPosition, 1.0f);
-	fPosition = vPosition;
-	fNormal = vNormal;
-	fTexCoords = vTexCoords;
+    // compute eye space coordinates
+    fPosEye = view * motorcycle_model * vec4(vPosition, 1.0f);
+    fNormal = normalize(motorcyle_normalMatrix * vNormal);
+    fragTexCoords = vTexCoords; // Add this line
+    gl_Position = projection * view * motorcycle_model * vec4(vPosition, 1.0f);
 }

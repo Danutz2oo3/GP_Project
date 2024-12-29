@@ -1,0 +1,108 @@
+# Blender 4.0.2 MTL File: 'None'
+# www.blender.org
+
+newmtl mat0
+Ka 0.490000 0.490000 0.490000
+Ks 0.500000 0.500000 0.500000
+Ke 0.000000 0.000000 0.000000
+Ni 1.000000
+d 1.000000
+illum 3
+map_Kd material_baseColor.jpg
+map_Ns material_metallicRoughness.png
+map_refl material_metallicRoughness.png
+map_Bump material_normal.png
+
+newmtl mat1
+Ka 1.000000 1.000000 1.000000
+Ks 0.500000 0.500000 0.500000
+Ke 0.000000 0.000000 0.000000
+Ni 1.000000
+d 1.000000
+illum 2
+map_Kd Mirrors_baseColor.jpg
+map_Ns Mirrors_metallicRoughness.png
+map_refl Mirrors_metallicRoughness.png
+map_Bump Mirrors_normal.png
+
+newmtl mat2
+Ka 1.000000 1.000000 1.000000
+Ks 0.500000 0.500000 0.500000
+Ke 0.000000 0.000000 0.000000
+Ni 1.000000
+d 1.000000
+illum 2
+map_Kd Exhaust_baseColor.jpg
+map_Ns Exhaust_metallicRoughness.png
+map_refl Exhaust_metallicRoughness.png
+map_Bump Exhaust_normal.jpg
+
+newmtl mat3
+Ka 1.000000 1.000000 1.000000
+Ks 0.500000 0.500000 0.500000
+Ke 0.000000 0.000000 0.000000
+Ni 1.000000
+d 1.000000
+illum 2
+map_Kd Bike_baseColor.png
+map_Ns Bike_metallicRoughness.png
+map_refl Bike_metallicRoughness.png
+map_Bump Bike_normal.png
+
+newmtl mat4
+Ns 780.000000
+Ka 0.950000 0.950000 0.950000
+Ks 0.500000 0.500000 0.500000
+Ke 0.000000 0.000000 0.000000
+Ni 1.000000
+d 1.000000
+illum 3
+map_Kd Chain_baseColor.png
+map_Bump Chain_normal.jpg
+
+newmtl mat5
+Ka 1.000000 1.000000 1.000000
+Ks 0.500000 0.500000 0.500000
+Ke 0.000000 0.000000 0.000000
+Ni 1.000000
+d 1.000000
+illum 2
+map_Kd Glass_baseColor.png
+map_Ns Glass_metallicRoughness.png
+map_refl Glass_metallicRoughness.png
+
+newmtl mat6
+Ka 0.540000 0.540000 0.540000
+Ks 0.500000 0.500000 0.500000
+Ke 0.000000 0.000000 0.000000
+Ni 1.000000
+d 1.000000
+illum 3
+map_Kd Tyre_baseColor.jpg
+map_Ns Tyre_metallicRoughness.png
+map_refl Tyre_metallicRoughness.png
+map_Bump Tyre_normal.png
+
+newmtl mat7
+Ka 1.000000 1.000000 1.000000
+Ks 0.500000 0.500000 0.500000
+Ke 0.000000 0.000000 0.000000
+Ni 1.000000
+d 1.000000
+illum 2
+map_Kd Grips_baseColor.jpg
+map_Ns Grips_metallicRoughness.png
+map_refl Grips_metallicRoughness.png
+map_Bump Grips_normal.png
+
+newmtl mat8
+Ka 0.760000 0.760000 0.760000
+Ks 0.500000 0.500000 0.500000
+Ke 0.000000 0.000000 0.000000
+Ni 1.000000
+d 1.000000
+illum 3
+map_Kd brake_baseColor.png
+map_Ns brake_metallicRoughness.png
+map_refl brake_metallicRoughness.png
+map_Bump brake_normal.jpg

@@ -64,7 +64,8 @@ namespace gps {
         /*  Render data  */
         Buffers buffers;
 
-	    // Initializes all the buffer objects/arrays
+	    // 
+        // ializes all the buffer objects/arrays
 	    void setupMesh();
 
     };

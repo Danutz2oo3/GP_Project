@@ -17,46 +17,62 @@
 #include "Shader.hpp"
 #include "Camera.hpp"
 #include "Model3D.hpp"
-
 #include <iostream>
 
 // window
 gps::Window myWindow;
 
-// matrices
-glm::mat4 model;
+// matrices for motorcycle
+glm::mat4 motorcycle_model;
+glm::mat3 motorcycle_normalMatrix;
+
+// matrices for parking_lot
+glm::mat4 parking_lot_model;
+glm::mat3 parking_lot_normalMatrix;
+
 glm::mat4 view;
 glm::mat4 projection;
-glm::mat3 normalMatrix;
 
 // light parameters
 glm::vec3 lightDir;
 glm::vec3 lightColor;
 
 // shader uniform locations
-GLint modelLoc;
+GLint motorcycle_modelLoc;
+GLint motorcycle_normalMatrixLoc;
+
+GLint parking_lot_modelLoc;
+GLint parking_lot_normalMatrixLoc;
+
+
 GLint viewLoc;
-GLint projectionLoc;
-GLint normalMatrixLoc;
 GLint lightDirLoc;
 GLint lightColorLoc;
+GLint projectionLoc;
+
 
 // camera
 gps::Camera myCamera(
-    glm::vec3(0.0f, 0.0f, 3.0f),
-    glm::vec3(0.0f, 0.0f, -10.0f),
+    glm::vec3(5.0f, 1.0f, 0.0f),
+    glm::vec3(0.0f, 1.0f, -1.0f),
     glm::vec3(0.0f, 1.0f, 0.0f));
 
 GLfloat cameraSpeed = 0.1f;
 
 GLboolean pressedKeys[1024];
 
+bool cameraLock = true;
+
 // models
-gps::Model3D teapot;
+gps::Model3D motorcycle;
 GLfloat angle;
+
+gps::Model3D parking_lot;
 
 // shaders
 gps::Shader myBasicShader;
+
+
 
 GLenum glCheckError_(const char *file, int line)
 {
@@ -110,65 +126,70 @@ void mouseCallback(GLFWwindow* window, double xpos, double ypos) {
 }
 
 void processMovement() {
-	if (pressedKeys[GLFW_KEY_W]) {
+	if (pressedKeys[GLFW_KEY_W] && !cameraLock) {
 		myCamera.move(gps::MOVE_FORWARD, cameraSpeed);
 		//update view matrix
         view = myCamera.getViewMatrix();
         myBasicShader.useShaderProgram();
         glUniformMatrix4fv(viewLoc, 1, GL_FALSE, glm::value_ptr(view));
-        // compute normal matrix for teapot
-        normalMatrix = glm::mat3(glm::inverseTranspose(view*model));
+        // compute normal matrix for motorcycle
+        motorcycle_normalMatrix = glm::mat3(glm::inverseTranspose(view*motorcycle_model));
 	}
 
-	if (pressedKeys[GLFW_KEY_S]) {
+	if (pressedKeys[GLFW_KEY_S] && !cameraLock) {
 		myCamera.move(gps::MOVE_BACKWARD, cameraSpeed);
         //update view matrix
         view = myCamera.getViewMatrix();
         myBasicShader.useShaderProgram();
         glUniformMatrix4fv(viewLoc, 1, GL_FALSE, glm::value_ptr(view));
-        // compute normal matrix for teapot
-        normalMatrix = glm::mat3(glm::inverseTranspose(view*model));
+        // compute normal matrix for motorcycle
+        motorcycle_normalMatrix = glm::mat3(glm::inverseTranspose(view* motorcycle_model));
 	}
 
-	if (pressedKeys[GLFW_KEY_A]) {
+	if (pressedKeys[GLFW_KEY_A] && !cameraLock) {
 		myCamera.move(gps::MOVE_LEFT, cameraSpeed);
         //update view matrix
         view = myCamera.getViewMatrix();
         myBasicShader.useShaderProgram();
         glUniformMatrix4fv(viewLoc, 1, GL_FALSE, glm::value_ptr(view));
-        // compute normal matrix for teapot
-        normalMatrix = glm::mat3(glm::inverseTranspose(view*model));
+        // compute normal matrix for motorcycle
+        motorcycle_normalMatrix = glm::mat3(glm::inverseTranspose(view* motorcycle_model));
 	}
 
-	if (pressedKeys[GLFW_KEY_D]) {
+	if (pressedKeys[GLFW_KEY_D] && !cameraLock) {
 		myCamera.move(gps::MOVE_RIGHT, cameraSpeed);
         //update view matrix
         view = myCamera.getViewMatrix();
         myBasicShader.useShaderProgram();
         glUniformMatrix4fv(viewLoc, 1, GL_FALSE, glm::value_ptr(view));
-        // compute normal matrix for teapot
-        normalMatrix = glm::mat3(glm::inverseTranspose(view*model));
+        // compute normal matrix for motorcycle
+        motorcycle_normalMatrix = glm::mat3(glm::inverseTranspose(view* motorcycle_model));
 	}
 
     if (pressedKeys[GLFW_KEY_Q]) {
         angle -= 1.0f;
-        // update model matrix for teapot
-        model = glm::rotate(glm::mat4(1.0f), glm::radians(angle), glm::vec3(0, 1, 0));
-        // update normal matrix for teapot
-        normalMatrix = glm::mat3(glm::inverseTranspose(view*model));
+        // update model matrix for motorcycle
+        motorcycle_model = glm::rotate(glm::mat4(1.0f), glm::radians(angle), glm::vec3(0, 1, 0));
+        // update normal matrix for motorcycle
+        motorcycle_normalMatrix = glm::mat3(glm::inverseTranspose(view* motorcycle_model));
+        //glUniformMatrix4fv(motorcycle_modelLoc, 1, GL_FALSE, glm::value_ptr(motorcycle_model));
     }
 
     if (pressedKeys[GLFW_KEY_E]) {
         angle += 1.0f;
-        // update model matrix for teapot
-        model = glm::rotate(glm::mat4(1.0f), glm::radians(angle), glm::vec3(0, 1, 0));
-        // update normal matrix for teapot
-        normalMatrix = glm::mat3(glm::inverseTranspose(view*model));
+        // update model matrix for motorcycle
+        motorcycle_model = glm::rotate(glm::mat4(1.0f), glm::radians(angle), glm::vec3(0, 1, 0));
+        // update normal matrix for motorcycle
+        motorcycle_normalMatrix = glm::mat3(glm::inverseTranspose(view* motorcycle_model));
+        //glUniformMatrix4fv(motorcycle_modelLoc, 1, GL_FALSE, glm::value_ptr(motorcycle_model));
     }
+	if (pressedKeys[GLFW_KEY_L]) {
+		cameraLock = !cameraLock;
+	}
 }
 
 void initOpenGLWindow() {
-    myWindow.Create(1024, 768, "OpenGL Project Core");
+    myWindow.Create(1024, 768, "MOTO SHOWCASE");
 }
 
 void setWindowCallbacks() {
@@ -189,36 +210,43 @@ void initOpenGLState() {
 }
 
 void initModels() {
-    teapot.LoadModel("models/teapot/teapot20segUT.obj");
+    motorcycle.LoadModel("models/Motorcycle/ImageToStl.com_honda_nr750_1994.obj", "models/Motorcycle/");
+	parking_lot.LoadModel("models/parking_lot/ImageToStl.com_parking_lot.obj", "models/parking_lot/");
 }
 
 void initShaders() {
 	myBasicShader.loadShader(
         "shaders/basic.vert",
         "shaders/basic.frag");
+
 }
 
 void initUniforms() {
 	myBasicShader.useShaderProgram();
 
     // create model matrix for teapot
-    model = glm::rotate(glm::mat4(1.0f), glm::radians(angle), glm::vec3(0.0f, 1.0f, 0.0f));
-	modelLoc = glGetUniformLocation(myBasicShader.shaderProgram, "model");
-
+	motorcycle_model = glm::mat4(1.0f);
+	motorcycle_modelLoc = glGetUniformLocation(myBasicShader.shaderProgram, "motorcycle_model");
+	parking_lot_model = glm::mat4(1.0f);
+	parking_lot_modelLoc = glGetUniformLocation(myBasicShader.shaderProgram, "parking_lot_model");
 	// get view matrix for current camera
 	view = myCamera.getViewMatrix();
 	viewLoc = glGetUniformLocation(myBasicShader.shaderProgram, "view");
 	// send view matrix to shader
     glUniformMatrix4fv(viewLoc, 1, GL_FALSE, glm::value_ptr(view));
 
-    // compute normal matrix for teapot
-    normalMatrix = glm::mat3(glm::inverseTranspose(view*model));
-	normalMatrixLoc = glGetUniformLocation(myBasicShader.shaderProgram, "normalMatrix");
+    // compute normal matrix for motorcycle
+    motorcycle_normalMatrix = glm::mat3(glm::inverseTranspose(view*motorcycle_model));
+	motorcycle_normalMatrixLoc = glGetUniformLocation(myBasicShader.shaderProgram, "motorcyle_normalMatrix");
 
+
+	// compute normal matrix for parking_lot
+	parking_lot_normalMatrix = glm::mat3(glm::inverseTranspose(view * parking_lot_model));
+	parking_lot_normalMatrixLoc = glGetUniformLocation(myBasicShader.shaderProgram, "parking_lot_normalMatrix");
 	// create projection matrix
 	projection = glm::perspective(glm::radians(45.0f),
                                (float)myWindow.getWindowDimensions().width / (float)myWindow.getWindowDimensions().height,
-                               0.1f, 20.0f);
+                               0.1f, 1000.0f);
 	projectionLoc = glGetUniformLocation(myBasicShader.shaderProgram, "projection");
 	// send projection matrix to shader
 	glUniformMatrix4fv(projectionLoc, 1, GL_FALSE, glm::value_ptr(projection));	
@@ -236,28 +264,37 @@ void initUniforms() {
 	glUniform3fv(lightColorLoc, 1, glm::value_ptr(lightColor));
 }
 
-void renderTeapot(gps::Shader shader) {
+void renderMotorcycle(gps::Shader shader) {
     // select active shader program
     shader.useShaderProgram();
 
-    //send teapot model matrix data to shader
-    glUniformMatrix4fv(modelLoc, 1, GL_FALSE, glm::value_ptr(model));
+	//motorcycle_model = glm::mat4(1.0f);
 
-    //send teapot normal matrix data to shader
-    glUniformMatrix3fv(normalMatrixLoc, 1, GL_FALSE, glm::value_ptr(normalMatrix));
+    //send motorcycle model matrix data to shader
+    glUniformMatrix4fv(motorcycle_modelLoc, 1, GL_FALSE, glm::value_ptr(motorcycle_model));
 
-    // draw teapot
-    teapot.Draw(shader);
+    //send motorcycle normal matrix data to shader
+    glUniformMatrix3fv(motorcycle_normalMatrixLoc, 1, GL_FALSE, glm::value_ptr(motorcycle_normalMatrix));
+
+
+    // draw motorcycle
+    motorcycle.Draw(shader);
+}
+
+void renderParkingLot(gps::Shader shader) {
+	shader.useShaderProgram();
+    //parking_lot_model = glm::mat4(1.0f);
+    glUniformMatrix4fv(parking_lot_modelLoc, 1, GL_FALSE, glm::value_ptr(parking_lot_model));
+    glUniformMatrix3fv(parking_lot_normalMatrixLoc, 1, GL_FALSE, glm::value_ptr(parking_lot_normalMatrix));
+    parking_lot.Draw(shader);
 }
 
 void renderScene() {
 	glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
-	//render the scene
-
-	// render the teapot
-	renderTeapot(myBasicShader);
-
+	//render the sccene
+    renderMotorcycle(myBasicShader);
+	renderParkingLot(myBasicShader);
 }
 
 void cleanup() {
