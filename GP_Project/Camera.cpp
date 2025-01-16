@@ -2,6 +2,7 @@
 #include <glm/gtx/rotate_vector.hpp>
 #include <glm/gtc/matrix_transform.hpp>
 #include <glm/gtc/type_ptr.hpp>
+
 namespace gps {
 
     //Camera constructor
@@ -11,7 +12,7 @@ namespace gps {
         this->cameraUpDirection = cameraUp;
         this->cameraFrontDirection = glm::normalize(cameraTarget - cameraPosition);
         this->cameraRightDirection = glm::normalize(glm::cross(this->cameraFrontDirection, this->cameraUpDirection));
-		this->cameraUpDirection = glm::normalize(glm::cross(this->cameraRightDirection, this->cameraFrontDirection));
+        this->cameraUpDirection = glm::normalize(glm::cross(this->cameraRightDirection, this->cameraFrontDirection));
     }
 
     //return the view matrix, using the glm::lookAt() function
@@ -19,23 +20,34 @@ namespace gps {
         return glm::lookAt(cameraPosition, cameraPosition + cameraFrontDirection, this->cameraUpDirection);
     }
 
-	glm::vec3 Camera::getPosition() const {
-		return cameraPosition;
-	}
+    glm::vec3 Camera::getCameraPosition() const {
+        return cameraPosition;
+    }
 
-	glm::vec3 Camera::getCameraTarget() const {
-		return cameraTarget;
-	}
+    void Camera::setCameraPosition(const glm::vec3& position) {
+        this->cameraPosition = position;
+    }
+
+    glm::vec3 Camera::getCameraTarget() const {
+        return cameraTarget;
+    }
+
+    void Camera::setCameraTarget(const glm::vec3& target) {
+        this->cameraTarget = target;
+        this->cameraFrontDirection = glm::normalize(target - cameraPosition);
+        this->cameraRightDirection = glm::normalize(glm::cross(cameraFrontDirection, glm::vec3(0.0f, 1.0f, 0.0f)));
+        this->cameraUpDirection = glm::cross(cameraRightDirection, cameraFrontDirection);
+    }
 
     //update the camera internal parameters following a camera move event
     void Camera::move(MOVE_DIRECTION direction, float speed) {
         switch (direction)
         {
         case gps::MOVE_FORWARD:
-			cameraPosition += cameraFrontDirection * speed;
+            cameraPosition += cameraFrontDirection * speed;
             break;
         case gps::MOVE_BACKWARD:
-			cameraPosition -= cameraFrontDirection * speed;
+            cameraPosition -= cameraFrontDirection * speed;
             break;
         case gps::MOVE_RIGHT:
             cameraPosition += cameraRightDirection * speed;
@@ -48,16 +60,15 @@ namespace gps {
         }
     }
 
-    //update the camera internal parameters following a camera rotate event
-    //yaw - camera rotation around the y axis
-    //pitch - camera rotation around the x axis
     void Camera::rotate(float pitch, float yaw) {
         cameraFrontDirection = glm::rotate(cameraFrontDirection, glm::radians(pitch), cameraRightDirection);
+
         cameraFrontDirection = glm::rotate(cameraFrontDirection, glm::radians(yaw), glm::vec3(0.0f, 1.0f, 0.0f));
+
         cameraFrontDirection = glm::normalize(cameraFrontDirection);
 
-
-        cameraRightDirection = glm::normalize(glm::cross(cameraFrontDirection, cameraUpDirection));
-        cameraUpDirection = glm::cross(cameraRightDirection, cameraFrontDirection);
+        cameraRightDirection = glm::normalize(glm::cross(cameraFrontDirection, glm::vec3(0.0f, 1.0f, 0.0f)));
+        cameraUpDirection = glm::normalize(glm::cross(cameraRightDirection, cameraFrontDirection));
     }
+
 }

@@ -6379,7 +6379,7 @@ typedef struct
 {
    int w,h;
    stbi_uc *out;                 // output buffer (always 4 components)
-   stbi_uc *background;          // The current "background" as far as a gif is concerned
+   stbi_uc *backparking_lot;          // The current "backparking_lot" as far as a gif is concerned
    stbi_uc *history;
    int flags, bgindex, ratio, transparent, eflags;
    stbi_uc  pal[256][4];
@@ -6600,7 +6600,7 @@ static stbi_uc *stbi__gif_load_next(stbi__context *s, stbi__gif *g, int *comp, i
    int pcount;
    STBI_NOTUSED(req_comp);
 
-   // on first frame, any non-written pixels get the background colour (non-transparent)
+   // on first frame, any non-written pixels get the backparking_lot colour (non-transparent)
    first_frame = 0;
    if (g->out == 0) {
       if (!stbi__gif_header(s, g, comp,0)) return 0; // stbi__g_failure_reason set by stbi__gif_header
@@ -6608,16 +6608,16 @@ static stbi_uc *stbi__gif_load_next(stbi__context *s, stbi__gif *g, int *comp, i
          return stbi__errpuc("too large", "GIF image is too large");
       pcount = g->w * g->h;
       g->out = (stbi_uc *) stbi__malloc(4 * pcount);
-      g->background = (stbi_uc *) stbi__malloc(4 * pcount);
+      g->backparking_lot = (stbi_uc *) stbi__malloc(4 * pcount);
       g->history = (stbi_uc *) stbi__malloc(pcount);
-      if (!g->out || !g->background || !g->history)
+      if (!g->out || !g->backparking_lot || !g->history)
          return stbi__errpuc("outofmem", "Out of memory");
 
-      // image is treated as "transparent" at the start - ie, nothing overwrites the current background;
-      // background colour is only used for pixels that are not rendered first frame, after that "background"
+      // image is treated as "transparent" at the start - ie, nothing overwrites the current backparking_lot;
+      // backparking_lot colour is only used for pixels that are not rendered first frame, after that "backparking_lot"
       // color refers to the color that was there the previous frame.
       memset(g->out, 0x00, 4 * pcount);
-      memset(g->background, 0x00, 4 * pcount); // state of the background (starts transparent)
+      memset(g->backparking_lot, 0x00, 4 * pcount); // state of the backparking_lot (starts transparent)
       memset(g->history, 0x00, pcount);        // pixels that were affected previous frame
       first_frame = 1;
    } else {
@@ -6626,7 +6626,7 @@ static stbi_uc *stbi__gif_load_next(stbi__context *s, stbi__gif *g, int *comp, i
       pcount = g->w * g->h;
 
       if ((dispose == 3) && (two_back == 0)) {
-         dispose = 2; // if I don't have an image to revert back to, default to the old background
+         dispose = 2; // if I don't have an image to revert back to, default to the old backparking_lot
       }
 
       if (dispose == 3) { // use previous graphic
@@ -6636,21 +6636,21 @@ static stbi_uc *stbi__gif_load_next(stbi__context *s, stbi__gif *g, int *comp, i
             }
          }
       } else if (dispose == 2) {
-         // restore what was changed last frame to background before that frame;
+         // restore what was changed last frame to backparking_lot before that frame;
          for (pi = 0; pi < pcount; ++pi) {
             if (g->history[pi]) {
-               memcpy( &g->out[pi * 4], &g->background[pi * 4], 4 );
+               memcpy( &g->out[pi * 4], &g->backparking_lot[pi * 4], 4 );
             }
          }
       } else {
          // This is a non-disposal case eithe way, so just
-         // leave the pixels as is, and they will become the new background
+         // leave the pixels as is, and they will become the new backparking_lot
          // 1: do not dispose
          // 0:  not specified.
       }
 
-      // background is what out is after the undoing of the previou frame;
-      memcpy( g->background, g->out, 4 * g->w * g->h );
+      // backparking_lot is what out is after the undoing of the previou frame;
+      memcpy( g->backparking_lot, g->out, 4 * g->w * g->h );
    }
 
    // clear my history;
@@ -6710,7 +6710,7 @@ static stbi_uc *stbi__gif_load_next(stbi__context *s, stbi__gif *g, int *comp, i
             // if this was the first frame,
             pcount = g->w * g->h;
             if (first_frame && (g->bgindex > 0)) {
-               // if first frame, any pixel not drawn to gets the background color
+               // if first frame, any pixel not drawn to gets the backparking_lot color
                for (pi = 0; pi < pcount; ++pi) {
                   if (g->history[pi] == 0) {
                      g->pal[g->bgindex][3] = 255; // just in case it was made transparent, undo that; It will be reset next frame if need be;
@@ -6797,7 +6797,7 @@ static void *stbi__load_gif_main(stbi__context *s, int **delays, int *x, int *y,
                if (NULL == tmp) {
                   STBI_FREE(g.out);
                   STBI_FREE(g.history);
-                  STBI_FREE(g.background);
+                  STBI_FREE(g.backparking_lot);
                   return stbi__errpuc("outofmem", "Out of memory");
                }
                else {
@@ -6831,7 +6831,7 @@ static void *stbi__load_gif_main(stbi__context *s, int **delays, int *x, int *y,
       // free temp buffer;
       STBI_FREE(g.out);
       STBI_FREE(g.history);
-      STBI_FREE(g.background);
+      STBI_FREE(g.backparking_lot);
 
       // do the final conversion after loading everything;
       if (req_comp && req_comp != 4)
@@ -6868,7 +6868,7 @@ static void *stbi__gif_load(stbi__context *s, int *x, int *y, int *comp, int req
 
    // free buffers needed for multiple frame loading;
    STBI_FREE(g.history);
-   STBI_FREE(g.background);
+   STBI_FREE(g.backparking_lot);
 
    return u;
 }

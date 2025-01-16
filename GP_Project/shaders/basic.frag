@@ -2,79 +2,74 @@
 
 in vec3 fNormal;
 in vec4 fPosEye;
-in vec2 fragTexCoords;
-
+in vec2 fTexCoords;
+in vec4 fragPosLightSpace;
 out vec4 fColor;
 
-// Time-based lighting (0.0 = night, 1.0 = day)
-uniform float timeOfDay;
+//lighting
+uniform	vec3 lightDir;
+uniform	vec3 lightColor;
 
-// Sunlight
-uniform vec3 sunDir;
-uniform vec3 sunColor;
-
-// Moonlight
-uniform vec3 moonDir;
-uniform vec3 moonColor;
-
-// Camera position (for reflections)
-uniform vec3 cameraPos;
-
-// Texture samplers
+//texture
 uniform sampler2D diffuseTexture;
 uniform sampler2D specularTexture;
+uniform sampler2D shadowMap;
 
-// Fresnel reflection parameters
-float fresnelStrength = 0.04;  // Fresnel base reflection (0.04 for dielectrics)
-float roughness = 0.3;         // Surface roughness (adjust for materials)
-float metallic = 0.1;          // Determines how metallic the material appears
-
-// Lighting properties
 vec3 ambient;
+float ambientStrength = 0.2f;
 vec3 diffuse;
 vec3 specular;
+float specularStrength = 0.5f;
+float shininess = 32.0f;
 
-void computeLightComponents() {
-    vec3 normalEye = normalize(fNormal);
-    vec3 viewDir = normalize(cameraPos - fPosEye.xyz);
-
-    // Interpolate between moonlight and sunlight
-    vec3 lightDir = normalize(mix(moonDir, sunDir, timeOfDay));
-    vec3 lightColor = mix(moonColor, sunColor, timeOfDay);
-
-    // Compute ambient light
-    float ambientStrength = mix(0.1f, 0.4f, timeOfDay);  // Stronger at night
-    ambient = ambientStrength * lightColor;
-
-    // Compute diffuse shading
-    float diff = max(dot(normalEye, lightDir), 0.0);
-    diffuse = diff * lightColor;
-
-    // Compute Fresnel reflection using Schlick's approximation
-    float fresnel = fresnelStrength + (1.0 - fresnelStrength) * pow(1.0 - max(dot(viewDir, normalEye), 0.0), 5.0);
-
-    // Compute microfacet-based specular highlights (Cook-Torrance model)
-    float specularStrength = mix(0.1f, 0.5f, timeOfDay); // Less at night
-    vec3 halfVector = normalize(lightDir + viewDir);
-    float spec = pow(max(dot(normalEye, halfVector), 0.0), (1.0 - roughness) * 128.0);
-    specular = specularStrength * spec * lightColor * fresnel;
+void computeLightComponents()
+{		
+	vec3 cameraPosEye = vec3(0.0f);//in eye coordinates, the viewer is situated at the origin
+	
+	//transform normal
+	vec3 normalEye = normalize(fNormal);	
+	
+	//compute light direction
+	vec3 lightDirN = normalize(lightDir);
+	
+	//compute view direction 
+	vec3 viewDirN = normalize(cameraPosEye - fPosEye.xyz);
+		
+	//compute ambient light
+	ambient = ambientStrength * lightColor;
+	
+	//compute diffuse light
+	diffuse = max(dot(normalEye, lightDirN), 0.0f) * lightColor;
+	
+	//compute specular light
+	vec3 reflection = reflect(-lightDirN, normalEye);
+	float specCoeff = pow(max(dot(viewDirN, reflection), 0.0f), shininess);
+	specular = specularStrength * specCoeff * lightColor;
 }
 
-void main() {
-    computeLightComponents();
+float computeShadow(){
+	vec3 normalizedCoords = fragPosLightSpace.xyz / fragPosLightSpace.w;
+	normalizedCoords = normalizedCoords * 0.5 + 0.5;
+	if(normalizedCoords.z > 1.0f) return 0.0f;
+	float closestDepth = texture(shadowMap, normalizedCoords.xy).r;
+	float currentDepth = normalizedCoords.z;
+	float bias = 0.005f;
+	float shadow = currentDepth - bias > closestDepth ? 1.0f : 0.0f;
+	return shadow;
+}
+void main() 
+{
+	computeLightComponents();
+	
+	vec3 baseColor = vec3(0.9f, 0.35f, 0.0f);//orange
+	
+	ambient *= texture(diffuseTexture, fTexCoords).rgb;
+	diffuse *= texture(diffuseTexture, fTexCoords).rgb;
+	specular *= texture(specularTexture, fTexCoords).rgb;
+
+	float shadow = computeShadow();
+
+	vec3 color = min((ambient + diffuse*(1-shadow)) + specular*(1-shadow), 1.0f);
     
-    // Sample base texture color
-    vec3 baseColor = texture(diffuseTexture, fragTexCoords).rgb;
-
-    // Apply textures to lighting components
-    ambient *= baseColor;
-    diffuse *= baseColor;
-    specular *= texture(specularTexture, fragTexCoords).rgb * metallic;
-
-    // Combine lighting and clamp
-    vec3 color = ambient + diffuse + specular;
-    color = min(color, vec3(1.0));
-
-    // Apply final color with realistic shading
-    fColor = vec4(color, 1.0);
+    fColor = vec4(color, 1.0f);
 }
