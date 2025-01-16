@@ -18,6 +18,7 @@
 #include "Camera.hpp"
 #include "Model3D.hpp"
 #include <iostream>
+#include "SkyBox.hpp"
 
 // window
 gps::Window myWindow;
@@ -36,6 +37,7 @@ glm::mat4 projection;
 // light parameters
 glm::vec3 lightDir;
 glm::vec3 lightColor;
+glm::vec3 lightPos;
 
 // shader uniform locations
 GLint motorcycle_modelLoc;
@@ -49,7 +51,12 @@ GLint viewLoc;
 GLint lightDirLoc;
 GLint lightColorLoc;
 GLint projectionLoc;
-
+GLint lightPosLoc;
+GLint moonColorLoc;
+GLint sunDirLoc;
+GLint sunColorLoc;
+GLint moonDirLoc;
+GLint timeOfDayLoc;
 
 // camera
 gps::Camera myCamera(
@@ -63,6 +70,8 @@ GLfloat cameraSpeed = 0.1f;
 GLboolean pressedKeys[1024];
 
 bool cameraLock = true;
+bool isDay = true;
+bool autoDayCycle = false;
 
 // models
 gps::Model3D motorcycle;
@@ -73,6 +82,9 @@ gps::Model3D parking_lot;
 // shaders
 gps::Shader myBasicShader;
 
+gps::SkyBox skyBox;
+
+gps::Shader skyboxShader;
 
 
 GLenum glCheckError_(const char *file, int line)
@@ -103,6 +115,31 @@ GLenum glCheckError_(const char *file, int line)
 }
 #define glCheckError() glCheckError_(__FILE__, __LINE__)
 
+void initSkyBox(bool isDay) {
+    std::vector<const GLchar*> faces;
+
+    if (!isDay) {
+        // Night skybox
+        faces.push_back("skybox/skyboxNight/posx.png"); // right
+        faces.push_back("skybox/skyboxNight/negx.png"); // left
+        faces.push_back("skybox/skyboxNight/posy.png"); // top
+        faces.push_back("skybox/skyboxNight/negy.png"); // bottom
+        faces.push_back("skybox/skyboxNight/posz.png"); // front
+        faces.push_back("skybox/skyboxNight/negz.png"); // back
+    }
+    else {
+        // Day skybox
+        faces.push_back("skybox/skyboxDay/px.png"); // right
+        faces.push_back("skybox/skyboxDay/nx.png"); // left
+        faces.push_back("skybox/skyboxDay/py.png"); // top
+        faces.push_back("skybox/skyboxDay/ny.png"); // bottom
+        faces.push_back("skybox/skyboxDay/pz.png"); // front
+        faces.push_back("skybox/skyboxDay/nz.png"); // back
+    }
+
+    skyBox.Load(faces);
+}
+
 void windowResizeCallback(GLFWwindow* window, int width, int height) {
 	fprintf(stdout, "Window resized! New width: %d , and height: %d\n", width, height);
 	//TODO
@@ -120,6 +157,17 @@ void keyboardCallback(GLFWwindow* window, int key, int scancode, int action, int
             pressedKeys[key] = false;
         }
     }
+    if (pressedKeys[GLFW_KEY_N] && action == GLFW_PRESS) {
+        isDay = !isDay;
+        initSkyBox(isDay);
+		myBasicShader.useShaderProgram();
+    }
+    if (pressedKeys[GLFW_KEY_L] && action == GLFW_PRESS) {
+        cameraLock = !cameraLock;
+    }
+	if (pressedKeys[GLFW_KEY_C] && action == GLFW_PRESS) {
+		autoDayCycle = !autoDayCycle;
+	}
 }
 
 void mouseCallback(GLFWwindow* window, double xpos, double ypos) {
@@ -188,9 +236,8 @@ void processMovement() {
 		parking_lot_normalMatrix = glm::mat3(glm::inverseTranspose(view * parking_lot_model));
         //glUniformMatrix4fv(motorcycle_modelLoc, 1, GL_FALSE, glm::value_ptr(motorcycle_model));
     }
-	if (pressedKeys[GLFW_KEY_L]) {
-		cameraLock = !cameraLock;
-	}
+	
+	
 	//std::cout << "Camera position: " << myCamera.getPosition().x << " " << myCamera.getPosition().y << " " << myCamera.getPosition().z << "\n";
 }
 
@@ -224,51 +271,94 @@ void initShaders() {
 	myBasicShader.loadShader(
         "shaders/basic.vert",
         "shaders/basic.frag");
+	skyboxShader.loadShader(
+		"shaders/skyboxShader.vert",
+		"shaders/skyboxShader.frag");
+	skyboxShader.useShaderProgram();
+}
 
+void updateUniforms() {
+    myBasicShader.useShaderProgram();
+
+    // Compute timeOfDay (0.0 = midnight, 1.0 = noon)
+    float timeOfDay = 0.0f;
+
+    if (autoDayCycle) {
+        timeOfDay = (sin(glfwGetTime() * 0.1f) + 1.0f) / 2.0f; // Cycles every ~62s
+    }
+    else {
+        timeOfDay = isDay ? 1.0f : 0.0f; // Manual toggle
+    }
+
+    glUniform1f(timeOfDayLoc, timeOfDay);
+
+    // Sunlight properties
+    glm::vec3 sunDir = glm::normalize(glm::vec3(-0.3f, -1.0f, -0.2f));
+    glm::vec3 sunColor = glm::vec3(1.0f, 0.95f, 0.85f); // Warm sunlight
+
+    // Moonlight properties
+    glm::vec3 moonDir = glm::normalize(glm::vec3(0.1f, -1.0f, 0.2f));
+    glm::vec3 moonColor = glm::vec3(0.3f, 0.3f, 0.6f); // Cool bluish moonlight
+
+    // Send updated light values to shader
+    glUniform3fv(sunDirLoc, 1, glm::value_ptr(sunDir));
+    glUniform3fv(sunColorLoc, 1, glm::value_ptr(sunColor));
+    glUniform3fv(moonDirLoc, 1, glm::value_ptr(moonDir));
+    glUniform3fv(moonColorLoc, 1, glm::value_ptr(moonColor));
+
+    // Detect day/night transition and update skybox
+    static bool lastDayState = true; // Store previous state
+    bool currentDayState = (timeOfDay > 0.3f); // Consider it "day" when timeOfDay is above 0.3
+
+    if (currentDayState != lastDayState) { // If transitioning day/night
+        initSkyBox(currentDayState);
+        lastDayState = currentDayState;
+    }
 }
 
 void initUniforms() {
-	myBasicShader.useShaderProgram();
+    myBasicShader.useShaderProgram();
 
-    // create model matrix for teapot
-	motorcycle_model = glm::mat4(1.0f);
-	motorcycle_modelLoc = glGetUniformLocation(myBasicShader.shaderProgram, "model");
-	parking_lot_model = glm::mat4(1.0f);
-	parking_lot_modelLoc = glGetUniformLocation(myBasicShader.shaderProgram, "model");
-	// get view matrix for current camera
-	view = myCamera.getViewMatrix();
-	viewLoc = glGetUniformLocation(myBasicShader.shaderProgram, "view");
-	// send view matrix to shader
+    // Create model matrices
+    motorcycle_model = glm::mat4(1.0f);
+    motorcycle_modelLoc = glGetUniformLocation(myBasicShader.shaderProgram, "model");
+
+    parking_lot_model = glm::mat4(1.0f);
+    parking_lot_modelLoc = glGetUniformLocation(myBasicShader.shaderProgram, "model");
+
+    // Get view matrix from camera
+    view = myCamera.getViewMatrix();
+    viewLoc = glGetUniformLocation(myBasicShader.shaderProgram, "view");
     glUniformMatrix4fv(viewLoc, 1, GL_FALSE, glm::value_ptr(view));
 
-    // compute normal matrix for motorcycle
-    motorcycle_normalMatrix = glm::mat3(glm::inverseTranspose(view*motorcycle_model));
-	motorcycle_normalMatrixLoc = glGetUniformLocation(myBasicShader.shaderProgram, "normalMatrix");
+    // Compute normal matrices
+    motorcycle_normalMatrix = glm::mat3(glm::inverseTranspose(view * motorcycle_model));
+    motorcycle_normalMatrixLoc = glGetUniformLocation(myBasicShader.shaderProgram, "normalMatrix");
 
+    parking_lot_normalMatrix = glm::mat3(glm::inverseTranspose(view * parking_lot_model));
+    parking_lot_normalMatrixLoc = glGetUniformLocation(myBasicShader.shaderProgram, "normalMatrix");
 
-	// compute normal matrix for parking_lot
-	parking_lot_normalMatrix = glm::mat3(glm::inverseTranspose(view * parking_lot_model));
-	parking_lot_normalMatrixLoc = glGetUniformLocation(myBasicShader.shaderProgram, "normalMatrix");
-	// create projection matrix
-	projection = glm::perspective(glm::radians(45.0f),
-                               (float)myWindow.getWindowDimensions().width / (float)myWindow.getWindowDimensions().height,
-                               0.1f, 1000.0f);
-	projectionLoc = glGetUniformLocation(myBasicShader.shaderProgram, "projection");
-	// send projection matrix to shader
-	glUniformMatrix4fv(projectionLoc, 1, GL_FALSE, glm::value_ptr(projection));	
+    // Create projection matrix
+    projection = glm::perspective(glm::radians(45.0f),
+        (float)myWindow.getWindowDimensions().width / (float)myWindow.getWindowDimensions().height,
+        0.1f, 1000.0f);
+    projectionLoc = glGetUniformLocation(myBasicShader.shaderProgram, "projection");
+    glUniformMatrix4fv(projectionLoc, 1, GL_FALSE, glm::value_ptr(projection));
 
-	//set the light direction (direction towards the light)
-	lightDir = glm::vec3(0.0f, 1.0f, 1.0f);
-	lightDirLoc = glGetUniformLocation(myBasicShader.shaderProgram, "lightDir");
-	// send light dir to shader
-	glUniform3fv(lightDirLoc, 1, glm::value_ptr(lightDir));
+    // Get uniform locations for time-based lighting (does not update here!)
+    timeOfDayLoc = glGetUniformLocation(myBasicShader.shaderProgram, "timeOfDay");
 
-	//set light color
-	lightColor = glm::vec3(1.0f, 1.0f, 1.0f); //white light
-	lightColorLoc = glGetUniformLocation(myBasicShader.shaderProgram, "lightColor");
-	// send light color to shader
-	glUniform3fv(lightColorLoc, 1, glm::value_ptr(lightColor));
+    sunDirLoc = glGetUniformLocation(myBasicShader.shaderProgram, "sunDir");
+    sunColorLoc = glGetUniformLocation(myBasicShader.shaderProgram, "sunColor");
+
+    moonDirLoc = glGetUniformLocation(myBasicShader.shaderProgram, "moonDir");
+    moonColorLoc = glGetUniformLocation(myBasicShader.shaderProgram, "moonColor");
+   
+
+    // Add this line in the initUniforms function
+    moonColorLoc = glGetUniformLocation(myBasicShader.shaderProgram, "moonColor");
 }
+
 
 void renderMotorcycle(gps::Shader shader) {
     // select active shader program
@@ -297,7 +387,7 @@ void renderParkingLot(gps::Shader shader) {
 
 void renderScene() {
 	glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
-
+    skyBox.Draw(skyboxShader, view, projection);
 	//render the sccene
     renderMotorcycle(myBasicShader);
 	renderParkingLot(myBasicShader);
@@ -321,12 +411,14 @@ int main(int argc, const char * argv[]) {
 	initModels();
 	initShaders();
 	initUniforms();
+    initSkyBox(true);
     setWindowCallbacks();
 
 	glCheckError();
 	// application loop
 	while (!glfwWindowShouldClose(myWindow.getWindow())) {
         processMovement();
+        updateUniforms();
 	    renderScene();
 
 		glfwPollEvents();

@@ -13,9 +13,6 @@ uniform mat4 view;
 uniform mat4 projection;
 uniform mat3 normalMatrix;
 
-
-
-
 void main() 
 {
     // compute eye space coordinates
