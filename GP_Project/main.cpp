@@ -49,10 +49,19 @@ GLuint parking_lotModelLoc;
 glm::mat3 parking_lot_normalMatrix;
 GLuint parking_lot_normalMatrixLoc;
 
-glm::vec3 lightDir;
-GLuint lightDirLoc;
-glm::vec3 lightColor;
-GLuint lightColorLoc;
+struct PointLight {
+	glm::vec3 position;
+	glm::vec3 color;
+	float constant;
+	float linear;
+	float quadratic;
+};
+
+std::vector<PointLight> pointLights = {
+	{ glm::vec3(-17.1872f, 6.7f, -4.89938f), glm::vec3(1.0f, 1.0f, 0.8f), 1.0f, 0.09f, 0.032f }, // First lamp
+	{ glm::vec3(-0.638713f, 6.7f, -5.18755f), glm::vec3(1.0f, 0.9f, 0.6f), 1.0f, 0.09f, 0.032f }, // Second lamp
+	{ glm::vec3(15.7567f, 6.7f, -5.2f), glm::vec3(1.0f, 1.0f, 1.0f), 1.0f, 0.09f, 0.032f } // Third lamp
+};
 
 gps::Camera myCamera(
 	glm::vec3(3.0f, 1.0f, 2.0f),   // Updated position: Closer and to the left
@@ -91,6 +100,13 @@ bool cameraLock = false;
 gps::SkyBox skyBox;
 
 gps::Shader skyboxShader;
+
+glm::vec3 sunLightPosition;
+glm::vec3 sunLightDir;
+glm::vec3 sunLightColor;
+GLint sunLightPositionLoc;
+GLint sunLightDirLoc;
+GLint sunLightColorLoc;
 
 using namespace std;
 
@@ -159,6 +175,7 @@ void keyboardCallback(GLFWwindow* window, int key, int scancode, int action, int
 	if (pressedKeys[GLFW_KEY_N] && action == GLFW_PRESS) {
 		if (isDay) timeOfDay = 24.0f;  // Set time to night
 		else timeOfDay = 8.0f;  // Set time to day
+		
 	}
 	if (pressedKeys[GLFW_KEY_L] && action == GLFW_PRESS) {
 		cameraLock = !cameraLock;
@@ -174,6 +191,7 @@ void mouseCallback(GLFWwindow* window, double xpos, double ypos) {
 }
 
 void processMovement() {
+	cout << "Camera position: " << myCamera.getCameraPosition().x << " " << myCamera.getCameraPosition().y << " " << myCamera.getCameraPosition().z << endl;
 	if (!cameraLock) {
 		if (pressedKeys[GLFW_KEY_W]) {
 			myCamera.move(gps::MOVE_FORWARD, cameraSpeed);
@@ -187,9 +205,23 @@ void processMovement() {
 		if (pressedKeys[GLFW_KEY_D]) {
 			myCamera.move(gps::MOVE_RIGHT, cameraSpeed);
 		}
+		if (pressedKeys[GLFW_KEY_UP]) {
+			myCamera.rotate(cameraSpeed * 10.0f, 0.0f);
+		}
+
+		if (pressedKeys[GLFW_KEY_DOWN]) {
+			myCamera.rotate(-cameraSpeed * 10.0f, 0.0f);
+		}
+
+		if (pressedKeys[GLFW_KEY_LEFT]) {
+			myCamera.rotate(0.0f, cameraSpeed * 10.0f);
+		}
+
+		if (pressedKeys[GLFW_KEY_RIGHT]) {
+			myCamera.rotate(0.0f, -cameraSpeed * 10.0f);
+		}
 	}
 	else {
-		// **🔹 Rotate Camera Around Motorcycle**
 		if (pressedKeys[GLFW_KEY_Q]) {
 			angle -= 1.0f; // Rotate left
 		}
@@ -223,51 +255,44 @@ void updateDayNightCycle() {
 
 	// Compute sun's position angle in a full cycle (0 to 2π radians)
 	float sun_angle = glm::radians(((timeOfDay - 6.0f) / 24.0f) * 360.0f);
-	cout << "Time of day: " << timeOfDay << " Sun angle: " << sun_angle << endl;
-	// **🔹 Adjust Light Position Calculation**
+
 	if (isDay) {
 		lightZ = cos(sun_angle) * 10.0f;  // Moves in a circular motion along Z
 		lightY = sin(sun_angle) * 10.0f;  // Moves up/down (highest at noon, lowest at midnight)
 	}
-	
 	else {
 		lightZ = cos(sun_angle + 3.1416f) * 10.0f;  // Moves in a circular motion along Z
 		lightY = sin(sun_angle + 3.1416f) * 10.0f;  // Moves up/down (highest at noon, lowest at midnight)
 	}
 
-	// **✅ Ensure Shadows Appear Properly**  
-	lightDir = glm::vec3(0.0f, lightY, lightZ);
+	sunLightDir = glm::vec3(0.0f, lightY, lightZ);
 
-	// **🔹 Improved Light Intensity Calculation**
-	float lightIntensity = glm::clamp(sin(sun_angle) * 1.2f, 0.2f, 1.0f); // Keep intensity within range
+	// Reduce overall brightness at night
+	float lightIntensity = glm::clamp(sin(sun_angle) * 1.2f, 0.1f, 1.0f); // Lower min to make night darker
 
-	// **🔹 Adjust the light color based on intensity**
 	glm::vec3 dayColor = glm::vec3(1.0f, 0.95f, 0.8f);  // Warm yellowish-white
-	glm::vec3 nightColor = glm::vec3(0.2f, 0.2f, 0.5f); // Cool blue
-	lightColor = glm::mix(nightColor, dayColor, lightIntensity);
+	glm::vec3 nightColor = glm::vec3(0.05f, 0.05f, 0.15f); // Almost black with a slight blue tint
+	sunLightColor = glm::mix(nightColor, dayColor, lightIntensity);
 
-	// **🔹 Update OpenGL uniforms**
+	// Update shaders
 	myCustomShader.useShaderProgram();
-	glUniform3fv(lightDirLoc, 1, glm::value_ptr(glm::normalize(lightDir)));
-	glUniform3fv(lightColorLoc, 1, glm::value_ptr(lightColor));
+	glUniform3fv(sunLightDirLoc, 1, glm::value_ptr(glm::normalize(sunLightDir)));
+	glUniform3fv(sunLightColorLoc, 1, glm::value_ptr(sunLightColor));
 
-	// **🔹 Switch skybox based on timeOfDay**
+	// **Change skybox when transitioning between day/night**
 	if (timeOfDay < 6.0f || timeOfDay > 18.0f) {
 		if (isDay) {
 			isDay = false;
-			initSkyBox(false);
+			initSkyBox(false);  // Load night skybox
 		}
 	}
 	else {
 		if (!isDay) {
 			isDay = true;
-			initSkyBox(true);
+			initSkyBox(true);  // Load day skybox
 		}
 	}
 }
-
-
-
 
 
 bool initOpenGLWindow()
@@ -398,18 +423,29 @@ void initUniforms() {
 	glUniformMatrix4fv(projectionLoc, 1, GL_FALSE, glm::value_ptr(projection));
 
 	//set the light direction (direction towards the light)
-	lightDir = glm::vec3(0.0f, 10.0f, 1.0f);
+	sunLightDir = glm::vec3(0.0f, 10.0f, 1.0f);
 	lightRotation = glm::rotate(glm::mat4(1.0f), glm::radians(lightAngle), glm::vec3(0.0f, 1.0f, 0.0f));
-	lightDirLoc = glGetUniformLocation(myCustomShader.shaderProgram, "lightDir");
-	glUniform3fv(lightDirLoc, 1, glm::value_ptr(glm::inverseTranspose(glm::mat3(view * lightRotation)) * lightDir));
+	sunLightDirLoc = glGetUniformLocation(myCustomShader.shaderProgram, "sunLightDir");
+	glUniform3fv(sunLightDirLoc, 1, glm::value_ptr(glm::inverseTranspose(glm::mat3(view * lightRotation)) * sunLightDir));
 
 	//set light color
-	lightColor = glm::vec3(1.0f, 1.0f, 1.0f); //white light
-	lightColorLoc = glGetUniformLocation(myCustomShader.shaderProgram, "lightColor");
-	glUniform3fv(lightColorLoc, 1, glm::value_ptr(lightColor));
+	sunLightColor = glm::vec3(1.0f, 1.0f, 1.0f); //white light
+	sunLightColorLoc = glGetUniformLocation(myCustomShader.shaderProgram, "sunLightColor");
+	glUniform3fv(sunLightColorLoc, 1, glm::value_ptr(sunLightColor));
+
+	for (int i = 0; i < pointLights.size(); i++) {
+		std::string base = "pointLights[" + std::to_string(i) + "]";
+		glUniform3fv(glGetUniformLocation(myCustomShader.shaderProgram, (base + ".position").c_str()), 1, glm::value_ptr(pointLights[i].position));
+		glUniform3fv(glGetUniformLocation(myCustomShader.shaderProgram, (base + ".color").c_str()), 1, glm::value_ptr(pointLights[i].color));
+		glUniform1f(glGetUniformLocation(myCustomShader.shaderProgram, (base + ".constant").c_str()), pointLights[i].constant);
+		glUniform1f(glGetUniformLocation(myCustomShader.shaderProgram, (base + ".linear").c_str()), pointLights[i].linear);
+		glUniform1f(glGetUniformLocation(myCustomShader.shaderProgram, (base + ".quadratic").c_str()), pointLights[i].quadratic);
+	}
 
 	lightShader.useShaderProgram();
 	glUniformMatrix4fv(glGetUniformLocation(lightShader.shaderProgram, "projection"), 1, GL_FALSE, glm::value_ptr(projection));
+
+	
 }
 
 void initFBO() {
@@ -439,7 +475,7 @@ glm::mat4 computeLightSpaceTrMatrix() {
 	lightRotation = glm::rotate(glm::mat4(1.0f), glm::radians(lightAngle), glm::vec3(0.0f, 1.0f, 0.0f));
 
 	// Adjust the light position to cover both objects
-	glm::vec3 lightPosition = glm::vec3(lightRotation * glm::vec4(lightDir, 1.0f)) + glm::vec3(0.0f, 5.0f, 0.0f);
+	glm::vec3 lightPosition = glm::vec3(lightRotation * glm::vec4(sunLightDir, 1.0f)) + glm::vec3(0.0f, 5.0f, 0.0f);
 
 	// Ensure shadows are computed for both objects by adjusting light projection
 	glm::mat4 lightView = glm::lookAt(lightPosition, glm::vec3(0.0f, 0.0f, 0.0f), glm::vec3(0.0f, 1.0f, 0.0f));
@@ -483,47 +519,33 @@ void drawObjects(gps::Shader shader, bool depthPass) {
 
 
 void renderScene() {
-
 	// depth maps creation pass
-	//TODO - Send the light-space transformation matrix to the depth map creation shader and
-	//		 render the scene in the depth map
 	depthMapShader.useShaderProgram();
 	glUniformMatrix4fv(glGetUniformLocation(depthMapShader.shaderProgram, "lightSpaceTrMatrix"),
-		1,
-		GL_FALSE,
-		glm::value_ptr(computeLightSpaceTrMatrix()));
+		1, GL_FALSE, glm::value_ptr(computeLightSpaceTrMatrix()));
+
 	glViewport(0, 0, SHADOW_WIDTH, SHADOW_HEIGHT);
 	glBindFramebuffer(GL_FRAMEBUFFER, shadowMapFBO);
 	glClear(GL_DEPTH_BUFFER_BIT);
 	drawObjects(depthMapShader, true);
 	glBindFramebuffer(GL_FRAMEBUFFER, 0);
 
-	// render depth map on screen - toggled with the M key
-
+	// Render depth map on screen (toggle with M key)
 	if (showDepthMap) {
 		glViewport(0, 0, retina_width, retina_height);
-
 		glClear(GL_COLOR_BUFFER_BIT);
-
 		screenQuadShader.useShaderProgram();
-
-		//bind the depth map
 		glActiveTexture(GL_TEXTURE0);
 		glBindTexture(GL_TEXTURE_2D, depthMapTexture);
 		glUniform1i(glGetUniformLocation(screenQuadShader.shaderProgram, "depthMap"), 0);
-
 		glDisable(GL_DEPTH_TEST);
 		screenQuad.Draw(screenQuadShader);
 		glEnable(GL_DEPTH_TEST);
 	}
 	else {
-
-		// final scene rendering pass (with shadows)
-
+		// Final scene rendering pass (with shadows)
 		glViewport(0, 0, retina_width, retina_height);
-
 		glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
-
 
 		myCustomShader.useShaderProgram();
 
@@ -531,33 +553,46 @@ void renderScene() {
 		glUniformMatrix4fv(viewLoc, 1, GL_FALSE, glm::value_ptr(view));
 
 		lightRotation = glm::rotate(glm::mat4(1.0f), glm::radians(lightAngle), glm::vec3(0.0f, 1.0f, 0.0f));
-		glUniform3fv(lightDirLoc, 1, glm::value_ptr(glm::inverseTranspose(glm::mat3(view * lightRotation)) * lightDir));
+		glUniform3fv(sunLightDirLoc, 1, glm::value_ptr(glm::inverseTranspose(glm::mat3(view * lightRotation)) * sunLightDir));
 
-		//bind the shadow map
+		// Bind shadow map
 		glActiveTexture(GL_TEXTURE3);
 		glBindTexture(GL_TEXTURE_2D, depthMapTexture);
 		glUniform1i(glGetUniformLocation(myCustomShader.shaderProgram, "shadowMap"), 3);
 
 		glUniformMatrix4fv(glGetUniformLocation(myCustomShader.shaderProgram, "lightSpaceTrMatrix"),
-			1,
-			GL_FALSE,
-			glm::value_ptr(computeLightSpaceTrMatrix()));
+			1, GL_FALSE, glm::value_ptr(computeLightSpaceTrMatrix()));
 
 		drawObjects(myCustomShader, false);
 
-		//draw a white cube around the light
-
+		// **🔹 Draw a small white cube at the sun position**
 		lightShader.useShaderProgram();
-
 		glUniformMatrix4fv(glGetUniformLocation(lightShader.shaderProgram, "view"), 1, GL_FALSE, glm::value_ptr(view));
 
 		model = lightRotation;
-		// Move the light cube **higher (Y-axis) and to the right (X-axis)**
-		model = glm::translate(model, lightDir + glm::vec3(0.5f, 1.0f, 0.0f));
+		model = glm::translate(model, sunLightDir + glm::vec3(0.5f, 1.0f, 0.0f));
 		model = glm::scale(model, glm::vec3(0.05f, 0.05f, 0.05f));
 		glUniformMatrix4fv(glGetUniformLocation(lightShader.shaderProgram, "model"), 1, GL_FALSE, glm::value_ptr(model));
-
 		lightCube.Draw(lightShader);
+
+		glm::vec3 boostedColor = isDay ? glm::vec3(1.0f, 1.0f, 1.0f) : glm::vec3(1.2f, 1.0f, 0.7f);  // Soft glow at night
+
+
+		myCustomShader.useShaderProgram();
+		for (int i = 0; i < pointLights.size(); i++) {
+			std::string base = "pointLights[" + std::to_string(i) + "]";
+			glm::vec3 adjustedColor = pointLights[i].color * boostedColor;
+			glUniform3fv(glGetUniformLocation(myCustomShader.shaderProgram, (base + ".color").c_str()), 1, glm::value_ptr(adjustedColor));
+		}
+
+		// **🔹 Draw small cubes at point light positions**
+		for (int i = 0; i < pointLights.size(); i++) {
+			model = glm::mat4(1.0f);
+			model = glm::translate(model, pointLights[i].position);
+			model = glm::scale(model, glm::vec3(0.05f, 0.05f, 0.05f)); // Small glowing cube for point light
+			glUniformMatrix4fv(glGetUniformLocation(lightShader.shaderProgram, "model"), 1, GL_FALSE, glm::value_ptr(model));
+			lightCube.Draw(lightShader);
+		}
 	}
 }
 
