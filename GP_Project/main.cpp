@@ -62,9 +62,14 @@ gps::Camera myCamera(
 
 float cameraSpeed = 0.1f;
 float angle;
+float lightZ, lightY;
 bool pressedKeys[1024];
 float angleY = 0.0f;
 GLfloat lightAngle;
+
+bool autoDayCycle = false;  // Enables automatic day-night cycle
+float timeOfDay = 8.0f;    // 0 = sunrise, 12 = noon, 24 = midnight
+float daySpeed = 0.02f;    // Controls the speed of transition
 
 gps::Model3D honda;
 gps::Model3D parking_lot;
@@ -82,11 +87,12 @@ GLuint depthMapTexture;
 bool showDepthMap;
 bool isDay = true;
 bool cameraLock = false;
-bool autoDayCycle = false;
 
 gps::SkyBox skyBox;
 
 gps::Shader skyboxShader;
+
+using namespace std;
 
 GLenum glCheckError_(const char* file, int line) {
 	GLenum errorCode;
@@ -151,16 +157,16 @@ void keyboardCallback(GLFWwindow* window, int key, int scancode, int action, int
 		}
 	}
 	if (pressedKeys[GLFW_KEY_N] && action == GLFW_PRESS) {
-		isDay = !isDay;
-		initSkyBox(isDay);
-		myCustomShader.useShaderProgram();
+		if (isDay) timeOfDay = 24.0f;  // Set time to night
+		else timeOfDay = 8.0f;  // Set time to day
 	}
 	if (pressedKeys[GLFW_KEY_L] && action == GLFW_PRESS) {
 		cameraLock = !cameraLock;
 	}
-	/*if (pressedKeys[GLFW_KEY_C] && action == GLFW_PRESS) {
-		autoDayCycle = !autoDayCycle;
-	}*/
+	if (pressedKeys[GLFW_KEY_C] && action == GLFW_PRESS) {
+		if (autoDayCycle) timeOfDay = 12.0f;  // Reset time to noon
+		autoDayCycle = !autoDayCycle;  // Toggle automatic cycle
+	}
 }
 
 void mouseCallback(GLFWwindow* window, double xpos, double ypos) {
@@ -208,6 +214,59 @@ void processMovement() {
 	normalMatrix = glm::mat3(glm::inverseTranspose(view * model));
 	glUniformMatrix3fv(normalMatrixLoc, 1, GL_FALSE, glm::value_ptr(normalMatrix));
 }
+
+void updateDayNightCycle() {
+	if (autoDayCycle) {
+		timeOfDay += daySpeed;
+		if (timeOfDay >= 24.0f) timeOfDay = 0.0f;  // Reset at midnight
+	}
+
+	// Compute sun's position angle in a full cycle (0 to 2π radians)
+	float sun_angle = glm::radians(((timeOfDay - 6.0f) / 24.0f) * 360.0f);
+	cout << "Time of day: " << timeOfDay << " Sun angle: " << sun_angle << endl;
+	// **🔹 Adjust Light Position Calculation**
+	if (isDay) {
+		lightZ = cos(sun_angle) * 10.0f;  // Moves in a circular motion along Z
+		lightY = sin(sun_angle) * 10.0f;  // Moves up/down (highest at noon, lowest at midnight)
+	}
+	
+	else {
+		lightZ = cos(sun_angle + 3.1416f) * 10.0f;  // Moves in a circular motion along Z
+		lightY = sin(sun_angle + 3.1416f) * 10.0f;  // Moves up/down (highest at noon, lowest at midnight)
+	}
+
+	// **✅ Ensure Shadows Appear Properly**  
+	lightDir = glm::vec3(0.0f, lightY, lightZ);
+
+	// **🔹 Improved Light Intensity Calculation**
+	float lightIntensity = glm::clamp(sin(sun_angle) * 1.2f, 0.2f, 1.0f); // Keep intensity within range
+
+	// **🔹 Adjust the light color based on intensity**
+	glm::vec3 dayColor = glm::vec3(1.0f, 0.95f, 0.8f);  // Warm yellowish-white
+	glm::vec3 nightColor = glm::vec3(0.2f, 0.2f, 0.5f); // Cool blue
+	lightColor = glm::mix(nightColor, dayColor, lightIntensity);
+
+	// **🔹 Update OpenGL uniforms**
+	myCustomShader.useShaderProgram();
+	glUniform3fv(lightDirLoc, 1, glm::value_ptr(glm::normalize(lightDir)));
+	glUniform3fv(lightColorLoc, 1, glm::value_ptr(lightColor));
+
+	// **🔹 Switch skybox based on timeOfDay**
+	if (timeOfDay < 6.0f || timeOfDay > 18.0f) {
+		if (isDay) {
+			isDay = false;
+			initSkyBox(false);
+		}
+	}
+	else {
+		if (!isDay) {
+			isDay = true;
+			initSkyBox(true);
+		}
+	}
+}
+
+
 
 
 
@@ -529,6 +588,7 @@ int main(int argc, const char* argv[]) {
 
 	while (!glfwWindowShouldClose(glWindow)) {
 		processMovement();
+		updateDayNightCycle();
 		renderScene();
 
 		glfwPollEvents();
